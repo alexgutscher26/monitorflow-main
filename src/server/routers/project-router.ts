@@ -24,6 +24,21 @@ export const projectRouter = router({
     const categoryCount = await db.eventCategory.count({
       where: { userId: user.id },
     })
+    
+    // Get webhook count
+    const webhookCount = await db.webhook.count({
+      where: { userId: user.id },
+    });
+    
+    console.log(`User ${user.id} has ${webhookCount} webhooks in database`);
+    
+    // Get detailed webhook information for debugging
+    const webhooks = await db.webhook.findMany({
+      where: { userId: user.id },
+      select: { id: true, name: true, createdAt: true }
+    });
+    
+    console.log('Webhooks in database:', webhooks);
 
     const limits = user.plan === "PRO" ? PRO_QUOTA : FREE_QUOTA
 
@@ -34,6 +49,8 @@ export const projectRouter = router({
       categoriesLimit: limits.maxEventCategories,
       eventsUsed: eventCount,
       eventsLimit: limits.maxEventsPerMonth,
+      webhooksUsed: webhookCount,
+      webhooksLimit: limits.maxWebhooks,
       resetDate,
     })
   }),

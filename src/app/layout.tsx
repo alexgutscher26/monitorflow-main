@@ -4,6 +4,7 @@ import { Providers } from "@/components/providers"
 import { EB_Garamond } from "next/font/google"
 import { cn } from "@/utils"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
 
 import "./globals.css"
 import { ClerkProvider } from "@clerk/nextjs"
@@ -66,6 +67,7 @@ export default function RootLayout({
             <main className="relative flex-1 flex flex-col">
               <Providers>{children}</Providers>
             </main>
+            <Toaster />
           </body>
         </ThemeProvider>
       </html>

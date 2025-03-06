@@ -8,6 +8,22 @@ import { parseColor } from "@/utils"
 import { HTTPException } from "hono/http-exception"
 
 export const categoryRouter = router({
+  // Get all event categories for webhooks
+  getCategories: privateProcedure.query(async ({ c, ctx }) => {
+    const { user } = ctx;
+
+    const categories = await db.eventCategory.findMany({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return c.superjson(categories);
+  }),
+
   getEventCategories: privateProcedure.query(async ({ c, ctx }) => {
     const now = new Date()
     const firstDayOfMonth = startOfMonth(now)

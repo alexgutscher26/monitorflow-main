@@ -5,16 +5,19 @@ import { client } from "@/lib/client"
 import { Plan } from "@prisma/client"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
-import { BarChart, Loader2 } from "lucide-react"
+import { BarChart, Loader2, Webhook } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
+import { FREE_QUOTA, PRO_QUOTA } from "@/config"
 
 interface UsageData {
   eventsUsed: number
   eventsLimit: number
   categoriesUsed: number
   categoriesLimit: number
+  webhooksUsed: number
+  webhooksLimit: number
   resetDate: string
 }
 
@@ -39,8 +42,35 @@ export const UpgradePageContent = ({ plan }: { plan: Plan }) => {
     queryFn: async (): Promise<UsageData> => {
       const res = await client.project.getUsage.$get()
       const data = await res.json()
+      
+      // Get webhook count
+      let webhooksUsed = 0;
+      try {
+        const webhooksRes = await client.webhooks.getWebhooks.$get();
+        const webhooksData = await webhooksRes.json();
+        
+        // Only count actual webhooks from the API, not mock webhooks
+        if (Array.isArray(webhooksData)) {
+          // Count visible webhooks instead of relying on database count
+          webhooksUsed = webhooksData.length;
+          console.log('Webhook count from API (array):', webhooksUsed);
+        } else if (webhooksData && typeof webhooksData === 'object' && webhooksData.webhooks && Array.isArray(webhooksData.webhooks)) {
+          webhooksUsed = webhooksData.webhooks.length;
+          console.log('Webhook count from API (object):', webhooksUsed);
+        }
+      } catch (error) {
+        console.error('Error fetching webhooks count:', error);
+        // Do not use mock webhooks for the count display
+      }
+      
+      // IMPORTANT: Manual override for webhook count
+      // This ensures the display shows the correct count regardless of database state
+      const visibleWebhookCount = webhooksUsed;
+      
       return {
         ...data,
+        webhooksUsed: visibleWebhookCount,
+        webhooksLimit: plan === "PRO" ? PRO_QUOTA.maxWebhooks : FREE_QUOTA.maxWebhooks,
         resetDate: data.resetDate.toString()
       }
     },
@@ -68,7 +98,7 @@ export const UpgradePageContent = ({ plan }: { plan: Plan }) => {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -125,6 +155,36 @@ export const UpgradePageContent = ({ plan }: { plan: Plan }) => {
                     {usageData?.categoriesLimit.toLocaleString() || 10}
                   </p>
                   <p className="text-xs/5 text-muted-foreground">Active categories</p>
+                </>
+              )}
+            </div>
+          </Card>
+        </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card className={`h-full ${plan === "PRO" ? "border-2 border-brand-700" : ""}`}>
+            <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <p className="text-sm/6 font-medium">Webhooks</p>
+              <Webhook className="size-4 text-muted-foreground" />
+            </div>
+
+            <div>
+              {isLoading ? (
+                <div className="animate-pulse space-y-2">
+                  <div className="h-8 w-32 bg-gray-200 rounded"></div>
+                  <div className="h-4 w-24 bg-gray-200 rounded"></div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">
+                    {usageData?.webhooksUsed || 0} of{" "}
+                    {usageData?.webhooksLimit === Infinity ? "∞" : usageData?.webhooksLimit || 1}
+                  </p>
+                  <p className="text-xs/5 text-muted-foreground">Active webhooks</p>
                 </>
               )}
             </div>

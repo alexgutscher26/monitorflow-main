@@ -32,6 +32,7 @@ model User {
   EventCategories EventCategory[]
   events           Event[]
   Quota           Quota[]
+  webhooks         Webhook[]
 
   @@index([email, apiKey])
 }
@@ -80,6 +81,8 @@ model Event {
   EventCategory   EventCategory? @relation(fields: [eventCategoryId], references: [id])
   eventCategoryId String?
 
+  webhookDeliveries WebhookDelivery[]
+
   @@index([createdAt])
 }
 
@@ -101,4 +104,58 @@ model RateLimit {
   resetAt DateTime
 
   @@index([key])
+}
+
+enum WebhookStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Webhook {
+  id          String        @id @default(cuid())
+  name        String
+  url         String
+  secret      String
+  description String?
+  status      WebhookStatus @default(ACTIVE)
+  
+  // Which event categories this webhook should receive
+  eventCategories String[]
+  
+  // Headers to send with the webhook request
+  headers     Json?
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  
+  // Delivery history
+  deliveries  WebhookDelivery[]
+  
+  @@index([userId])
+  @@unique([name, userId])
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhookId   String
+  
+  event       Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  eventId     String?
+  
+  requestBody String
+  responseBody String?
+  statusCode  Int?
+  
+  success     Boolean
+  error       String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([webhookId])
+  @@index([eventId])
 }

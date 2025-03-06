@@ -1,9 +1,11 @@
 import { FREE_QUOTA, PRO_QUOTA } from "@/config"
 import { db } from "@/db"
 import { DiscordClient } from "@/lib/discord-client"
+import { WebhookClient, WebhookPayload } from "@/lib/webhook-client"
 import { CATEGORY_NAME_VALIDATOR } from "@/lib/validators/category-validator"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
+import crypto from "crypto"
 
 const REQUEST_VALIDATOR = z
   .object({
@@ -185,6 +187,83 @@ export const POST = async (req: NextRequest) => {
       },
     })
 
+    // Find all active webhooks that should receive this event
+    const webhooks = await db.webhook.findMany({
+      where: {
+        userId: user.id,
+        status: "ACTIVE",
+        eventCategories: {
+          has: category.name,
+        },
+      },
+    });
+
+    // Process webhooks in parallel with Discord notification
+    const webhookPromises = webhooks.map(async (webhook) => {
+      try {
+        // Create webhook payload
+        const webhookPayload: WebhookPayload = {
+          id: crypto.randomUUID(),
+          event: {
+            id: event.id,
+            name: event.name,
+            category: category.name,
+            fields: event.fields as Record<string, any>,
+            createdAt: event.createdAt.toISOString(),
+          },
+          timestamp: new Date().toISOString(),
+          account: {
+            id: user.id,
+          },
+        };
+
+        // Send webhook
+        const result = await WebhookClient.sendWebhook(
+          webhook.url,
+          webhookPayload,
+          webhook.secret,
+          webhook.headers as Record<string, string> || {}
+        );
+
+        // Record delivery
+        await db.webhookDelivery.create({
+          data: {
+            webhookId: webhook.id,
+            eventId: event.id,
+            requestBody: JSON.stringify(webhookPayload),
+            responseBody: result.responseBody,
+            statusCode: result.statusCode,
+            success: result.success,
+            error: result.error,
+          },
+        });
+
+        return result;
+      } catch (error) {
+        console.error(`Error sending webhook ${webhook.id}:`, error);
+        
+        // Record failed delivery
+        await db.webhookDelivery.create({
+          data: {
+            webhookId: webhook.id,
+            eventId: event.id,
+            requestBody: JSON.stringify({
+              event: {
+                id: event.id,
+                name: event.name,
+                category: category.name,
+                fields: event.fields,
+              },
+            }),
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          },
+        });
+        
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+      }
+    });
+
     try {
       await Promise.all([
         discord.sendEmbed(dmChannel.id, eventData),
@@ -201,7 +280,8 @@ export const POST = async (req: NextRequest) => {
             year: currentYear,
             count: 1,
           },
-        })
+        }),
+        ...webhookPromises
       ])
     } catch (err) {
       console.error("Discord delivery error:", err)

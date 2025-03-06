@@ -33,7 +33,7 @@
 ## Integrations
 
 - [ ] Add Slack integration as an alternative to Discord
-- [ ] Implement webhook support for custom integrations
+- [DONE] Implement webhook support for custom integrations
 - [ ] Add email notifications option
 - [ ] Create integrations with popular services (GitHub, Stripe webhooks, etc.)
 - [ ] Add SMS notifications for critical events

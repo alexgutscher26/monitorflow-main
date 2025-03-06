@@ -4,7 +4,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { cn } from "@/utils"
 import { UserButton } from "@clerk/nextjs"
-import { Gem, Home, Key, LucideIcon, Menu, Settings, X } from "lucide-react"
+import { Gem, Home, Key, LucideIcon, Menu, Settings, Webhook, X } from "lucide-react"
 import Link from "next/link"
 import { PropsWithChildren, useState, useCallback } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -28,6 +28,10 @@ const SIDEBAR_ITEMS: SidebarCategory[] = [
   {
     category: "Overview",
     items: [{ href: "/dashboard", icon: Home, text: "Dashboard" }],
+  },
+  {
+    category: "Integrations",
+    items: [{ href: "/dashboard/webhooks", icon: Webhook, text: "Webhooks" }],
   },
   {
     category: "Account",
